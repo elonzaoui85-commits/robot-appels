@@ -5,7 +5,8 @@ Robot d'appels vocaux et de SMS via Twilio (PowerShell + interface HTML locale),
 ## Règles importantes
 
 - **Ce dépôt est public et sert de mise à jour automatique.** Tout ce qui est poussé sur `main` est installé
-  automatiquement sur les deux ordinateurs au prochain lancement du robot (`mise_a_jour.ps1`).
+  automatiquement sur les deux ordinateurs (`mise_a_jour.ps1`) : au lancement du robot, puis toutes les
+  30 minutes pendant qu'il tourne (redémarrage automatique quand aucun appel/SMS n'est en cours).
   Ne pousser sur `main` que du code testé et fonctionnel.
 - **Jamais de secret ni de donnée client ici** : pas de clé Twilio, de clé IA, de mot de passe, de numéro
   de téléphone réel, de liste de clients ni de résultats. `config.json` n'est qu'un modèle : la mise à jour

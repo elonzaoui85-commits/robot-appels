@@ -302,7 +302,7 @@ function Avancer-Campagne {
 
 # ---------- Empêcher la mise en veille pendant une campagne ----------
 
-if (-not $IsMacOS) {
+if (-not $IsMacOS -and -not ('RobotAppels.Veille' -as [type])) {   # déjà chargé si le robot a redémarré après une mise à jour
     Add-Type -Namespace RobotAppels -Name Veille -MemberDefinition '[DllImport("kernel32.dll")] public static extern uint SetThreadExecutionState(uint esFlags);'
 }
 $script:eveilActif = $false

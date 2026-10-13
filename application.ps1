@@ -2,8 +2,11 @@
 # L'interface est dans interface\index.html. Les clés (Twilio, IA) restent sur cet ordinateur, dans config.json.
 # Se lance avec le raccourci "Robot appels" du Bureau (Windows) ou "Lancer Robot appels.command" (Mac). Avec -Arriere (démarrage de Windows), il tourne sans ouvrir de fenêtre.
 # Le serveur reste actif 24 h/24 : fermer la fenêtre n'arrête pas les campagnes.
+# Il vérifie aussi les mises à jour toutes les 30 minutes et redémarre tout seul sur la nouvelle version.
 
-param([switch]$Arriere, [switch]$SansMaj)
+# -SansMaj : pas de vérification au démarrage (la version vient d'être installée).
+# -Redemarrage et -Jetons : utilisés seulement quand le robot redémarre après une mise à jour (sessions conservées).
+param([switch]$Arriere, [switch]$SansMaj, [switch]$Redemarrage, [string]$Jetons)
 
 $ErrorActionPreference = 'Stop'
 $dossier = $PSScriptRoot
@@ -64,6 +67,7 @@ function Definir([string]$nom, $valeur) {
 }
 
 $script:sessions = @{}
+foreach ($j in ([string]$Jetons).Split(',')) { if ($j) { $script:sessions[$j] = $true } }
 
 function Session-Valide($req) {
     $c = $req.Cookies['session']
@@ -455,16 +459,25 @@ $script:dernierSignal = Get-Date
 . (Join-Path $dossier 'moteur_campagne.ps1')
 $script:camp = Charger-Campagne
 
-$ecoute = New-Object Net.HttpListener
-$ecoute.Prefixes.Add($adresse)
-try { $ecoute.Start() }
-catch { if (-not $Arriere) { Ouvrir-Fenetre }; exit }   # le robot tourne déjà : on rouvre juste la fenêtre
+# Après une mise à jour, on réessaie quelques secondes le temps que l'ancienne version libère le port.
+for ($essai = 1; ; $essai++) {
+    $ecoute = New-Object Net.HttpListener
+    $ecoute.Prefixes.Add($adresse)
+    try { $ecoute.Start(); break }
+    catch {
+        if (-not $Redemarrage -or $essai -ge 20) { if (-not $Arriere) { Ouvrir-Fenetre }; exit }   # le robot tourne déjà : on rouvre juste la fenêtre
+        Start-Sleep -Milliseconds 500
+    }
+}
 
 if (-not $Arriere) { Ouvrir-Fenetre }
 
 # Le serveur tourne en continu : il répond à la fenêtre et fait avancer la campagne environ une fois par seconde.
 $tache = $ecoute.GetContextAsync()
 $dernierTour = Get-Date
+$derniereVerifMaj = Get-Date
+$intervalleMajMinutes = 30
+$script:redemarrer = $false
 while (-not $script:quitter) {
     if ($tache.Wait(1000)) {
         $ctx = $tache.Result
@@ -477,7 +490,19 @@ while (-not $script:quitter) {
         try { Avancer-Campagne } catch {}
         try { Sauver-Campagne; Gerer-Veille } catch {}
     }
+    # Mise à jour sans fermer le robot : seulement quand aucun appel ou SMS n'est en cours.
+    if (((Get-Date) - $derniereVerifMaj).TotalMinutes -ge $intervalleMajMinutes -and
+        -not @($script:camp.clients | Where-Object { $_.statut -eq 'encours' }).Count) {
+        $derniereVerifMaj = Get-Date
+        if (& (Join-Path $dossier 'mise_a_jour.ps1') -Dossier $dossier) { $script:redemarrer = $true; break }
+    }
 }
 try { Sauver-Campagne -Forcer } catch {}
 try { Liberer-Veille } catch {}
-$ecoute.Stop()
+$ecoute.Close()
+
+if ($script:redemarrer) {
+    # La campagne est enregistrée dans campagne.json : la nouvelle version la reprend là où elle en était.
+    Write-Host 'Nouvelle version installee : le robot redemarre...' -ForegroundColor Green
+    & (Join-Path $dossier 'application.ps1') -Arriere -SansMaj -Redemarrage -Jetons ($script:sessions.Keys -join ',')
+}

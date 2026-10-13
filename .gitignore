@@ -1,0 +1,5 @@
+resultats/
+campagne.json
+version.txt
+*.csv
+*.xlsx

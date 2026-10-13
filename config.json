@@ -1,0 +1,41 @@
+{
+    "twilio":  {
+                   "account_sid":  "XXXX",
+                   "auth_token":  "XXXX",
+                   "numero":  "+33XXXXXXXXX"
+               },
+    "message":  "Bonjour {prenom}, ici votre message. Bonne journee.",
+    "voix":  "Polly.Lea-Neural",
+    "audio_url":  "",
+    "repeter_message":  true,
+    "laisser_message_repondeur":  false,
+    "sonnerie_secondes":  25,
+    "pause_entre_appels_secondes":  5,
+    "horaires":  {
+                     "jours":  [
+                                   "lundi",
+                                   "mardi",
+                                   "mercredi",
+                                   "jeudi",
+                                   "vendredi",
+                                   "samedi",
+                                   "dimanche"
+                               ],
+                     "debut":  "00:00",
+                     "fin":  "23:59"
+                 },
+    "acces":  null,
+    "ia_cle":  "XXXX",
+    "mode":  "appel",
+    "sms_texte":  "Bonjour {prenom}, ici votre message. STOP au 36180",
+    "respecter_horaires":  false,
+    "vitesse":  100,
+    "ia_autonome":  true,
+    "nombre_appels":  1,
+    "rappeler_toujours":  false,
+    "delai_rappel_minutes":  0,
+    "expediteur_sms":  "INFO",
+    "numeros_test":  [
+
+                     ]
+}

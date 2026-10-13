@@ -117,7 +117,7 @@ function Remettre-Clients([string]$groupe) {
     foreach ($cl in $script:camp.clients) {
         if (-not $cl.numero -or $cl.statut -in 'attente', 'encours') { continue }
         if ($groupe -eq 'tous_traites' -or (Groupe-Statut $cl.statut) -eq $groupe) {
-            $cl.statut = 'attente'; $cl.sms = $null; $cl.detail = ''; $cl.resultat = ''; $cl.tentatives = 0; $cl.apres = $null; $cl.dernierStatut = $null; $n++
+            $cl.statut = 'attente'; $cl.sms = $null; $cl.detail = ''; $cl.resultat = ''; $cl.tentatives = 0; $cl.decroches = 0; $cl.apres = $null; $cl.dernierStatut = $null; $n++
         }
     }
     if ($n -and $script:camp.etat -in 'vide', 'terminee') { $script:camp.etat = 'pret' }
@@ -158,7 +158,10 @@ function Pause-Campagne {
 
 function Reglage-Rappels {
     $max = $(if ($script:cfg.nombre_appels) { [int]$script:cfg.nombre_appels } else { 1 })
-    @{ max = [math]::Max(1, $max); toujours = ($script:cfg.rappeler_toujours -ne $false); delai = [int]$script:cfg.delai_rappel_minutes }
+    # Rappels d'une personne qui a déjà décroché : 2 au maximum, espacés d'au moins 5 min, pour ne pas harceler.
+    $apres = [math]::Max(0, [math]::Min(2, [int]$script:cfg.rappels_apres_decroche))
+    $delaiApres = $(if ($null -ne $script:cfg.delai_apres_decroche) { [math]::Max(5, [int]$script:cfg.delai_apres_decroche) } else { 5 })
+    @{ max = [math]::Max(1, $max); delai = [int]$script:cfg.delai_rappel_minutes; apresDecroche = $apres; delaiApresDecroche = $delaiApres }
 }
 
 function Terminer-Contact($cl, [string]$statut, [string]$resultat) {
@@ -172,12 +175,16 @@ function Terminer-Contact($cl, [string]$statut, [string]$resultat) {
     $libelle = $(if ($r.max -gt 1) { "$resultat (contact $($cl.tentatives)/$($r.max))" } else { $resultat })
     try { Ajouter-Resultat (Join-Path $d "resultats_$($script:camp.id).csv") $client $libelle ([string]$cl.reponduPar) $cl.duree ([string]$cl.detail) } catch {}
 
-    # Encore des contacts prévus pour ce numéro ? (toujours, ou seulement si la personne n'a pas été jointe)
+    # Encore des contacts prévus pour ce numéro ?
+    # - pas joint : on réessaie jusqu'au nombre d'appels prévu ;
+    # - joint (a décroché) : seulement les quelques rappels autorisés après un décroché.
     $joint = $statut -in 'abouti', 'repondeur', 'sms', 'smsrecu'
-    if ($statut -ne 'invalide' -and $cl.tentatives -lt $r.max -and ($r.toujours -or -not $joint)) {
+    if ($joint) { $cl.decroches = [int]$cl.decroches + 1 }
+    $encore = $statut -ne 'invalide' -and $cl.tentatives -lt $r.max -and (-not $joint -or $cl.decroches -le $r.apresDecroche)
+    if ($encore) {
         $cl.dernierStatut = $statut
         $cl.statut = 'attente'
-        $cl.apres = (Get-Date).AddMinutes($r.delai).ToString('o')
+        $cl.apres = (Get-Date).AddMinutes($(if ($joint) { $r.delaiApresDecroche } else { $r.delai })).ToString('o')
     } else {
         $cl.statut = $statut
         $cl.apres = $null

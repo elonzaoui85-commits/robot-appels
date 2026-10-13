@@ -555,13 +555,13 @@ canvas#confettis { position: fixed; inset: 0; z-index: 40; pointer-events: none;
       <div class="ai-caps"><span>Rédaction</span><span>Résultats</span><span>Conseils</span><span>Mode d'emploi</span></div>
       <div class="activation" id="activationIA" hidden>
         <h3>Active ton assistant.</h3>
-        <p>L'assistant utilise Claude. Il faut une clé personnelle (quelques centimes par conversation). Un abonnement claude.ai ne suffit pas : la clé vient de <b>console.anthropic.com</b>.</p>
+        <p><b>Gratuit</b> avec Google Gemini : il suffit d'un compte Google, sans carte bancaire. (Une clé Claude payante, qui commence par sk-ant-, marche aussi.)</p>
         <ol>
-          <li><span>Crée un compte sur <a href="https://console.anthropic.com" target="_blank" rel="noopener">console.anthropic.com</a> et ajoute du crédit dans <b>Billing</b> (5 $ suffisent).</span></li>
-          <li><span>Va dans <b>API Keys</b> → <b>Create Key</b>, puis clique sur <b>Copy</b>.</span></li>
+          <li><span>Va sur <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener">aistudio.google.com/apikey</a> et connecte-toi avec ton compte Google.</span></li>
+          <li><span>Clique sur <b>Create API key</b>, puis sur <b>Copy</b> (la clé commence par <b>AIza</b> ou <b>AQ.</b>).</span></li>
           <li><span>Colle la clé ci-dessous (<b>Ctrl + V</b>, ou <b>Cmd + V</b> sur Mac) et clique sur <b>Activer</b>. Elle reste uniquement sur cet ordinateur.</span></li>
         </ol>
-        <input class="champ" type="password" id="champCleIA" placeholder="sk-ant-…" autocomplete="off" style="margin-bottom:10px">
+        <input class="champ" type="password" id="champCleIA" placeholder="AIza… ou AQ.…" autocomplete="off" style="margin-bottom:10px">
         <button class="btn btn-principal btn-large" id="btnCleIA"><svg><use href="#i-etincelle"/></svg><span>Activer l'assistant</span></button>
       </div>
       <div class="fil" id="fil"></div>
@@ -606,7 +606,11 @@ canvas#confettis { position: fixed; inset: 0; z-index: 40; pointer-events: none;
         <div><input class="champ" type="number" id="choixNombreAppels" min="1" max="50"><small style="color:var(--dim);font-size:.72rem">fois chaque numéro</small></div>
         <div><input class="champ" type="number" id="choixDelaiRappel" min="0" max="10080"><small style="color:var(--dim);font-size:.72rem">minutes entre deux rappels</small></div>
       </div>
-      <div class="bascule" style="margin-top:8px"><div>Rappeler même si la personne a décroché<small>Désactivé : rappelle seulement ceux qui n'ont pas été joints</small></div><label class="interrupteur"><input type="checkbox" id="choixRappelerToujours"><span></span></label></div>
+      <label style="margin-top:12px">Si la personne a décroché</label>
+      <div class="deux">
+        <div><select class="champ" id="choixRappelsDecroche"><option value="0">Ne plus la rappeler</option><option value="1">La rappeler 1 fois</option><option value="2">La rappeler 2 fois (maximum)</option></select></div>
+        <div><input class="champ" type="number" id="choixDelaiDecroche" min="5" max="10080"><small style="color:var(--dim);font-size:.72rem">minutes avant de la rappeler (5 min.)</small></div>
+      </div>
     </div>
     <div class="groupe"><label>Pause entre deux appels : <b id="valeurPause"></b> s</label><input type="range" id="choixPause" min="2" max="60"></div>
     <div class="pied-modale"><button class="btn" id="btnFermerReglages">Annuler</button><button class="btn btn-principal" id="btnSauverReglages">Enregistrer</button></div>
@@ -1314,7 +1318,8 @@ $('#btnReglages').addEventListener('click', async () => {
   $('#choixNumerosTest').value = (c.numerosTest || []).map(joliNumero).join('\n');
   $('#choixNombreAppels').value = c.nombreAppels || 1;
   $('#choixDelaiRappel').value = c.delaiRappel || 0;
-  $('#choixRappelerToujours').checked = c.rappelerToujours !== false;
+  $('#choixRappelsDecroche').value = String(c.rappelsApresDecroche || 0);
+  $('#choixDelaiDecroche').value = c.delaiApresDecroche || 5;
   $('#choixIaAutonome').checked = c.iaAutonome !== false;
   $('#choixDemarrage').checked = !!c.demarrageAuto;
   $('#choixDemarrage').closest('.bascule').style.display = c.mac ? 'none' : '';   // option propre à Windows
@@ -1340,7 +1345,8 @@ $('#btnSauverReglages').addEventListener('click', async () => {
       repeter: $('#choixRepeter').checked, repondeur: $('#choixRepondeur').checked, pause: Number($('#choixPause').value),
       expediteur: $('#choixExpediteur').value.trim() || 'INFO', numeros_test: lignesTest,
       nombre_appels: Number($('#choixNombreAppels').value) || 1, delai_rappel_minutes: Number($('#choixDelaiRappel').value) || 0,
-      rappeler_toujours: $('#choixRappelerToujours').checked, ia_autonome: $('#choixIaAutonome').checked,
+      rappels_apres_decroche: Number($('#choixRappelsDecroche').value), delai_apres_decroche: Math.max(5, Number($('#choixDelaiDecroche').value) || 5),
+      ia_autonome: $('#choixIaAutonome').checked,
     });
     if ($('#choixDemarrage').checked !== !!etat.compte.demarrageAuto) await api('/api/demarrage', { actif: $('#choixDemarrage').checked });
     $('#voileReglages').hidden = true;
@@ -1369,7 +1375,8 @@ function reglagesPourIA() {
     respecter_horaires: c.respecterHoraires !== false, jours: c.horaires?.jours, debut: c.horaires?.debut, fin: c.horaires?.fin,
     voix: c.voix, vitesse: c.vitesse, repeter: c.repeter, repondeur: c.repondeur, pause: c.pause, expediteur_sms: c.expediteur,
     numeros_test: (c.numerosTest || []).map(joliNumero),
-    nombre_appels: c.nombreAppels || 1, rappeler_meme_si_repondu: c.rappelerToujours !== false, delai_rappel_minutes: c.delaiRappel || 0,
+    nombre_appels: c.nombreAppels || 1, delai_rappel_minutes: c.delaiRappel || 0,
+    rappels_apres_decroche: c.rappelsApresDecroche || 0, delai_apres_decroche: c.delaiApresDecroche || 5,
   };
 }
 function etatPourIA() {
@@ -1444,7 +1451,8 @@ const OUTILS = {
     if (a.pause != null) corps.pause = a.pause;
     if (a.expediteur_sms != null) corps.expediteur = a.expediteur_sms;
     if (a.nombre_appels != null) corps.nombre_appels = a.nombre_appels;
-    if (a.rappeler_meme_si_repondu != null) corps.rappeler_toujours = a.rappeler_meme_si_repondu;
+    if (a.rappels_apres_decroche != null) corps.rappels_apres_decroche = a.rappels_apres_decroche;
+    if (a.delai_apres_decroche != null) corps.delai_apres_decroche = a.delai_apres_decroche;
     if (a.delai_rappel_minutes != null) corps.delai_rappel_minutes = a.delai_rappel_minutes;
     if (a.numeros_test != null) {
       const mauvais = a.numeros_test.filter(n => !normNumero(n));

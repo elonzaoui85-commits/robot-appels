@@ -122,7 +122,7 @@ function Message-Erreur($err) {
         # Avec Invoke-WebRequest, le message d'erreur du serveur est dans le corps de la réponse.
         try { $s = $err.Exception.Response.GetResponseStream(); $s.Position = 0; $detail = (New-Object IO.StreamReader($s)).ReadToEnd() } catch {}
     }
-    try { $j = $detail | ConvertFrom-Json; if ($j.error.message) { $detail = $j.error.message } elseif ($j.message) { $detail = $j.message } } catch {}
+    if ($detail) { try { $j = $detail | ConvertFrom-Json -ErrorAction Stop; if ($j.error.message) { $detail = $j.error.message } elseif ($j.message) { $detail = $j.message } } catch {} }
     if (-not $detail) { $detail = $err.Exception.Message }
     return $detail
 }
@@ -137,7 +137,7 @@ Tu es l'assistant IA intégré à "Robot appels", une application qui contacte a
 Tu pilotes l'application grâce à tes outils : lire l'état, lister/ajouter/supprimer des clients, remettre des clients à rappeler, modifier le message vocal et le texte SMS, changer le mode (appel, sms, appel_puis_sms), choisir la cadence (un par un, ou tous en même temps), programmer une date et heure de départ, modifier les réglages (horaires ou 24 h/24, voix, vitesse, répétition, répondeur, pause, expéditeur SMS, numéros de test, nombre de contacts par numéro et délai entre deux rappels), lancer ou mettre en pause la campagne, faire un test, ouvrir les résultats. Tu peux aussi chercher sur Internet quand c'est utile.
 Le robot tourne 24 h/24 en arrière-plan sur l'ordinateur : une campagne lancée ou programmée continue même si la fenêtre est fermée, tant que l'ordinateur reste allumé et connecté à Internet.
 Tu agis à la place de l'utilisateur, de bout en bout :
-- Quand il demande quelque chose, enchaîne toi-même toutes les étapes avec tes outils, sans lui demander de cliquer ni de valider chaque étape. Exemple : "appelle dix fois de suite ces numéros et prépare-leur un bon message" = ajouter_clients (remplacer_liste si ce sont de nouveaux numéros), modifier_messages avec un message que tu rédiges, modifier_reglages (nombre_appels 10, delai_rappel_minutes 0, rappeler_meme_si_repondu true), choisir_mode appel, choisir_cadence, programmer "maintenant" (ou l'heure demandée), puis lancer_campagne. Ensuite résume en quelques lignes ce que tu as fait.
+- Quand il demande quelque chose, enchaîne toi-même toutes les étapes avec tes outils, sans lui demander de cliquer ni de valider chaque étape. Exemple : "appelle dix fois de suite ces numéros et prépare-leur un bon message" = ajouter_clients (remplacer_liste si ce sont de nouveaux numéros), modifier_messages avec un message que tu rédiges, modifier_reglages (nombre_appels 10, delai_rappel_minutes 0), choisir_mode appel, choisir_cadence, programmer "maintenant" (ou l'heure demandée), puis lancer_campagne. Ensuite résume en quelques lignes ce que tu as fait.
 - Ne pose une question que si une information indispensable manque vraiment (par exemple aucun numéro donné). Sinon choisis toi-même des réglages raisonnables et dis lesquels.
 - Si une campagne est déjà en cours et qu'on te demande d'autres appels, mets-la en pause, applique les changements, puis relance.
 - Heure : l'utilisateur a choisi de pouvoir contacter 24 h/24. Ne modifie JAMAIS de toi-même les horaires ni "respecter_horaires" (ne les active pas, ne change pas les heures) : seulement s'il le demande explicitement. S'il demande d'appeler maintenant et que "respecter_horaires" est activé, désactive-le.
@@ -171,7 +171,7 @@ $outilsIA = @'
  {"name":"choisir_mode","description":"Choisit comment contacter les clients.","input_schema":{"type":"object","properties":{"mode":{"type":"string","enum":["appel","sms","appel_puis_sms"],"description":"appel_puis_sms = SMS envoyé seulement si l'appel n'aboutit pas."}},"required":["mode"],"additionalProperties":false}},
  {"name":"choisir_cadence","description":"Choisit si les clients sont contactés un par un, ou tous en même temps (environ un nouveau contact par seconde, sans limite de nombre).","input_schema":{"type":"object","properties":{"tous_en_meme_temps":{"type":"boolean"}},"required":["tous_en_meme_temps"],"additionalProperties":false}},
  {"name":"programmer","description":"Programme l'heure de départ de la campagne, ou l'annule pour partir tout de suite.","input_schema":{"type":"object","properties":{"date_heure":{"type":"string","description":"Date et heure locales au format AAAA-MM-JJTHH:MM, ou \"maintenant\" pour annuler la programmation."}},"required":["date_heure"],"additionalProperties":false}},
- {"name":"modifier_reglages","description":"Modifie les réglages. Ne fournir que ce qui change.","input_schema":{"type":"object","properties":{"respecter_horaires":{"type":"boolean","description":"false = appeler à n'importe quelle heure."},"jours":{"type":"array","items":{"type":"string","enum":["lundi","mardi","mercredi","jeudi","vendredi","samedi","dimanche"]}},"debut":{"type":"string","description":"HH:MM"},"fin":{"type":"string","description":"HH:MM"},"voix":{"type":"string","enum":["Polly.Lea-Neural","Polly.Remi-Neural"],"description":"Lea = femme, Remi = homme."},"vitesse":{"type":"integer","description":"Vitesse de la voix en %, de 70 à 130 (100 = normale)."},"repeter":{"type":"boolean"},"repondeur":{"type":"boolean","description":"Détecter les répondeurs et attendre le bip pour y laisser le message. Attention : ajoute 4 à 8 secondes de silence avant que le robot parle quand une personne décroche. false = le robot parle immédiatement."},"nombre_appels":{"type":"integer","description":"Nombre de fois que chaque numéro est contacté (1 à 50)."},"rappeler_meme_si_repondu":{"type":"boolean","description":"true = refaire tous les contacts prévus même si la personne a décroché ; false = rappeler seulement si elle n'a pas été jointe."},"delai_rappel_minutes":{"type":"integer","description":"Minutes d'attente avant de recontacter le même numéro (0 = tout de suite)."},"pause":{"type":"integer","description":"Secondes entre deux contacts (2 à 120)."},"expediteur_sms":{"type":"string","description":"Nom affiché pour les SMS : 11 caractères max, lettres/chiffres/espaces, au moins une lettre."},"numeros_test":{"type":"array","items":{"type":"string"},"description":"Liste complète des numéros qui reçoivent les appels et SMS de test (sans limite). Remplace la liste actuelle."}},"additionalProperties":false}},
+ {"name":"modifier_reglages","description":"Modifie les réglages. Ne fournir que ce qui change.","input_schema":{"type":"object","properties":{"respecter_horaires":{"type":"boolean","description":"false = appeler à n'importe quelle heure."},"jours":{"type":"array","items":{"type":"string","enum":["lundi","mardi","mercredi","jeudi","vendredi","samedi","dimanche"]}},"debut":{"type":"string","description":"HH:MM"},"fin":{"type":"string","description":"HH:MM"},"voix":{"type":"string","enum":["Polly.Lea-Neural","Polly.Remi-Neural"],"description":"Lea = femme, Remi = homme."},"vitesse":{"type":"integer","description":"Vitesse de la voix en %, de 70 à 130 (100 = normale)."},"repeter":{"type":"boolean"},"repondeur":{"type":"boolean","description":"Détecter les répondeurs et attendre le bip pour y laisser le message. Attention : ajoute 4 à 8 secondes de silence avant que le robot parle quand une personne décroche. false = le robot parle immédiatement."},"nombre_appels":{"type":"integer","description":"Nombre de fois que chaque numéro est contacté (1 à 50)."},"rappels_apres_decroche":{"type":"integer","description":"Nombre de rappels d'une personne qui a déjà décroché : 0, 1 ou 2 au maximum (au-delà ce serait du harcèlement, l'application le refuse)."},"delai_apres_decroche":{"type":"integer","description":"Minutes avant de rappeler une personne qui a décroché (5 minimum)."},"delai_rappel_minutes":{"type":"integer","description":"Minutes d'attente avant de recontacter le même numéro (0 = tout de suite)."},"pause":{"type":"integer","description":"Secondes entre deux contacts (2 à 120)."},"expediteur_sms":{"type":"string","description":"Nom affiché pour les SMS : 11 caractères max, lettres/chiffres/espaces, au moins une lettre."},"numeros_test":{"type":"array","items":{"type":"string"},"description":"Liste complète des numéros qui reçoivent les appels et SMS de test (sans limite). Remplace la liste actuelle."}},"additionalProperties":false}},
  {"name":"lancer_campagne","description":"Lance (ou reprend) la campagne avec le mode et la programmation actuels. L'utilisateur doit confirmer dans une fenêtre.","input_schema":{"type":"object","properties":{},"additionalProperties":false}},
  {"name":"mettre_en_pause","description":"Met la campagne en pause après le contact en cours.","input_schema":{"type":"object","properties":{},"additionalProperties":false}},
  {"name":"faire_un_test","description":"Envoie un appel test ou un SMS test à tous les numéros de test (après confirmation de l'utilisateur).","input_schema":{"type":"object","properties":{"type":{"type":"string","enum":["appel","sms"]}},"required":["type"],"additionalProperties":false}},
@@ -206,6 +206,9 @@ function Requete-IA([string]$messagesJson) {
     '{"model":"' + $modeleIA + '","max_tokens":16000,"output_config":{"effort":"high"},"fallbacks":"default",' +
         '"system":' + (ConvertTo-Json $consignesIA -Compress) + ',"tools":' + $outilsIA + ',"messages":' + $messagesJson + '}'
 }
+
+# Assistant gratuit (Google Gemini), utilisé dès qu'une clé Google est enregistrée.
+. (Join-Path $dossier 'ia_gemini.ps1')
 
 # ---------- Routes ----------
 
@@ -276,12 +279,14 @@ function Traiter($ctx) {
                 mode = $(if ($c.mode) { [string]$c.mode } else { 'appel' })
                 numerosTest = @(Numeros-Test $c)
                 nombreAppels = $(if ($c.nombre_appels) { [int]$c.nombre_appels } else { 1 })
-                rappelerToujours = ($c.rappeler_toujours -ne $false)
+                rappelsApresDecroche = [math]::Max(0, [math]::Min(2, [int]$c.rappels_apres_decroche))
+                delaiApresDecroche = $(if ($null -ne $c.delai_apres_decroche) { [math]::Max(5, [int]$c.delai_apres_decroche) } else { 5 })
                 delaiRappel = [int]$c.delai_rappel_minutes
                 iaAutonome = ($c.ia_autonome -ne $false)
                 demarrageAuto = ((-not $surMac) -and (Test-Path (Join-Path ([Environment]::GetFolderPath('Startup')) 'Robot appels (24h).lnk')))
                 mac = $surMac
-                credit = $credit; devise = $devise; iaActive = [bool]$c.ia_cle
+                credit = $credit; devise = $devise; iaActive = [bool]($c.ia_cle_gemini -or $c.ia_cle)
+                iaFournisseur = $(if ($c.ia_cle_gemini) { 'gemini' } elseif ($c.ia_cle) { 'claude' } else { '' })
             }
         }
         '/api/reglages' {
@@ -296,7 +301,8 @@ function Traiter($ctx) {
             if ($null -ne $corps.vitesse) { Definir 'vitesse' ([math]::Max(70, [math]::Min(130, [int]$corps.vitesse))) }
             if ($null -ne $corps.ia_autonome) { Definir 'ia_autonome' ([bool]$corps.ia_autonome) }
             if ($null -ne $corps.nombre_appels) { Definir 'nombre_appels' ([math]::Max(1, [math]::Min(50, [int]$corps.nombre_appels))) }
-            if ($null -ne $corps.rappeler_toujours) { Definir 'rappeler_toujours' ([bool]$corps.rappeler_toujours) }
+            if ($null -ne $corps.rappels_apres_decroche) { Definir 'rappels_apres_decroche' ([math]::Max(0, [math]::Min(2, [int]$corps.rappels_apres_decroche))) }
+            if ($null -ne $corps.delai_apres_decroche) { Definir 'delai_apres_decroche' ([math]::Max(5, [math]::Min(10080, [int]$corps.delai_apres_decroche))) }
             if ($null -ne $corps.delai_rappel_minutes) { Definir 'delai_rappel_minutes' ([math]::Max(0, [math]::Min(10080, [int]$corps.delai_rappel_minutes))) }
             if ($null -ne $corps.numeros_test) {
                 $liste = @(@($corps.numeros_test) | ForEach-Object { Normaliser-Numero ([string]$_) } | Where-Object { $_ } | Select-Object -Unique)
@@ -395,8 +401,18 @@ function Traiter($ctx) {
             # La clé est collée dans la case de l'application ; à défaut, on la prend dans le presse-papiers.
             $cle = ([string]$corps.cle).Trim()
             if (-not $cle) { try { $cle = ([string](Get-Clipboard -Raw)).Trim() } catch {} }
+            if ($cle -match '^(AIza[0-9A-Za-z_\-]{30,}|AQ\.[0-9A-Za-z._\-]{20,})$') {
+                # Clé gratuite Google Gemini
+                try { $modele = Tester-CleGemini $cle } catch { Repondre $ctx 400 @{ erreur = $_.Exception.Message }; return }
+                Definir 'ia_cle_gemini' $cle
+                Definir 'ia_modele_gemini' $modele
+                Enregistrer-Config $dossier $script:cfg
+                if (-not $corps.cle) { try { Set-Clipboard -Value ' ' } catch {} }
+                Repondre $ctx 200 @{ ok = $true; fournisseur = 'gemini'; modele = $modele }
+                return
+            }
             if ($cle -notmatch '^sk-ant-[A-Za-z0-9_\-]{20,}$') {
-                Repondre $ctx 400 @{ erreur = "Ce n'est pas une cle valide : elle doit commencer par sk-ant-. Copie-la depuis console.anthropic.com (API Keys) puis colle-la dans la case." }
+                Repondre $ctx 400 @{ erreur = "Ce n'est pas une cle valide : une cle Google gratuite commence par AIza ou AQ. (aistudio.google.com/apikey), une cle Claude par sk-ant-." }
                 return
             }
             try { Tester-CleIA $cle } catch { Repondre $ctx 400 @{ erreur = $_.Exception.Message }; return }
@@ -431,9 +447,12 @@ function Traiter($ctx) {
             Repondre $ctx 200 @{ ok = $true; numeros = $envoyes; erreurs = $erreurs }
         }
         '/api/ia' {
-            if (-not $script:cfg.ia_cle) { Repondre $ctx 400 @{ erreur = "L'assistant IA n'est pas encore active." }; return }
+            if (-not ($script:cfg.ia_cle_gemini -or $script:cfg.ia_cle)) { Repondre $ctx 400 @{ erreur = "L'assistant IA n'est pas encore active." }; return }
             if (-not $brut -or -not $brut.TrimStart().StartsWith('[') -or $brut.Length -gt 3000000) { Repondre $ctx 400 @{ erreur = 'Conversation invalide' }; return }
-            try { Repondre-Brut $ctx (Envoyer-IA $script:cfg.ia_cle (Requete-IA $brut)) }
+            try {
+                if ($script:cfg.ia_cle_gemini) { Repondre-Brut $ctx (Demander-Gemini $brut) }
+                else { Repondre-Brut $ctx (Envoyer-IA $script:cfg.ia_cle (Requete-IA $brut)) }
+            }
             catch { Repondre $ctx 502 @{ erreur = $_.Exception.Message } }
         }
         '/api/quitter' {

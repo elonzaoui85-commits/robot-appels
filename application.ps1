@@ -473,6 +473,8 @@ function Numeros-Test($cfg) {
 # ---------- Démarrage ----------
 
 $script:cfg = Lire-Config $dossier
+# Une clé « XXXX » vient d'une copie nettoyée de config.json : ce n'est pas une vraie clé.
+foreach ($k in 'ia_cle', 'ia_cle_gemini') { if ($script:cfg.$k -eq 'XXXX') { $script:cfg.$k = '' } }
 $script:quitter = $false
 $script:dernierSignal = Get-Date
 . (Join-Path $dossier 'moteur_campagne.ps1')

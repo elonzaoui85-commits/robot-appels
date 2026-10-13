@@ -94,12 +94,18 @@ function Ajouter-Clients($clients, [bool]$remplacer, [string]$source, $colonnes)
     return @{ ajoutes = $ajoutes - $invalides; invalides = $invalides; doublons = $doublons; total = $c.clients.Count }
 }
 
-function Supprimer-Clients($numeros) {
+# Retire des clients par numéro ; $bruts sert aux lignes sans numéro valide (retirées par leur texte d'origine).
+function Supprimer-Clients($numeros, $bruts) {
     $cibles = @{}
     foreach ($n in @($numeros)) { $x = Normaliser-Numero ([string]$n); if ($x) { $cibles[$x] = $true } }
+    $ciblesBrutes = @{}
+    foreach ($b in @($bruts)) { if ($null -ne $b) { $ciblesBrutes[[string]$b] = $true } }
     $avant = $script:camp.clients.Count
     $garder = New-Object System.Collections.ArrayList
-    foreach ($cl in $script:camp.clients) { if (-not ($cl.numero -and $cibles.ContainsKey($cl.numero) -and $cl.statut -ne 'encours')) { [void]$garder.Add($cl) } }
+    foreach ($cl in $script:camp.clients) {
+        $vise = ($cl.numero -and $cibles.ContainsKey($cl.numero)) -or (-not $cl.numero -and $ciblesBrutes.ContainsKey([string]$cl.brut))
+        if (-not ($vise -and $cl.statut -ne 'encours')) { [void]$garder.Add($cl) }
+    }
     $script:camp.clients = $garder
     Marquer-Campagne
     return @{ supprimes = $avant - $garder.Count; restants = $garder.Count }

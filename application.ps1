@@ -369,7 +369,7 @@ function Traiter($ctx) {
             try { Repondre $ctx 200 (Ajouter-Clients $corps.clients ([bool]$corps.remplacer) ([string]$corps.source) $corps.colonnes) }
             catch { Repondre $ctx 400 @{ erreur = $_.Exception.Message } }
         }
-        '/api/campagne/supprimer' { Repondre $ctx 200 (Supprimer-Clients $corps.numeros) }
+        '/api/campagne/supprimer' { Repondre $ctx 200 (Supprimer-Clients $corps.numeros $corps.bruts) }
         '/api/campagne/remettre' { Repondre $ctx 200 (Remettre-Clients ([string]$corps.groupe)) }
         '/api/campagne/lancer' {
             try { Lancer-Campagne $corps; Repondre $ctx 200 @{ ok = $true; etat = $script:camp.etat } }

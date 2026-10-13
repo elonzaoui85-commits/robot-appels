@@ -271,6 +271,11 @@ tbody tr.courant { background: linear-gradient(90deg, rgba(242,242,240,.06), tra
 td { padding: 11px 22px; font-size: .86rem; }
 td.num { color: var(--dim); width: 52px; font-family: var(--mono); font-size: .72rem; }
 td.tel { color: var(--muted); font-family: var(--mono); font-size: .78rem; }
+td.suppr { width: 46px; padding: 6px 14px 6px 0; text-align: right; }
+.btn-suppr { width: 28px; height: 28px; border-radius: var(--r-sm); border: 1px solid transparent; background: none; color: var(--dim); font-size: 1.05rem; line-height: 1; cursor: pointer; opacity: .45; transition: opacity .2s, color .2s, border-color .2s; }
+tbody tr:hover .btn-suppr { opacity: 1; }
+.btn-suppr:hover { color: var(--ko); border-color: var(--line-2); }
+.btn-suppr:disabled { visibility: hidden; }
 .avatar { display: inline-grid; place-items: center; width: 28px; height: 28px; border-radius: var(--r-sm); margin-right: 12px; font-size: .64rem; font-weight: 600; font-family: var(--mono); color: var(--silver-2); border: 1px solid var(--line-2); background: var(--ink); vertical-align: middle; }
 .statut { display: inline-flex; align-items: center; gap: 7px; padding: 4px 10px; border-radius: 999px; font-size: .72rem; border: 1px solid var(--line-2); color: var(--silver); white-space: nowrap; }
 .statut::before { content: ''; width: 5px; height: 5px; border-radius: 50%; background: var(--c, var(--dim)); }
@@ -539,11 +544,12 @@ canvas#confettis { position: fixed; inset: 0; z-index: 40; pointer-events: none;
 
     <section class="carte carte-tableau">
       <div class="titre-carte"><span class="etape">04 —</span><h2>Clients</h2><span class="aide" id="compteClients"></span>
+        <button class="btn" id="btnVider" style="margin-left:12px;height:36px;padding:0 13px;font-size:.76rem;display:none" title="Effacer tous les numéros de la liste">Vider la liste</button>
         <button class="btn" id="btnResultats" style="margin-left:12px;height:36px;padding:0 13px;font-size:.76rem"><svg><use href="#i-dossier"/></svg>Résultats</button></div>
       <div class="filtres" id="filtres"></div>
       <div class="defile" id="zoneTableau">
         <div class="vide" id="videTableau"><div><svg><use href="#i-groupe"/></svg><strong>Aucun client pour l'instant.</strong>Importe ta liste ou écris les numéros à l'étape 01.</div></div>
-        <table id="tableau" hidden><thead><tr><th>#</th><th>Client</th><th>Téléphone</th><th>Statut</th></tr></thead><tbody id="corpsTableau"></tbody></table>
+        <table id="tableau" hidden><thead><tr><th>#</th><th>Client</th><th>Téléphone</th><th>Statut</th><th></th></tr></thead><tbody id="corpsTableau"></tbody></table>
       </div>
     </section>
 
@@ -1064,14 +1070,41 @@ function dessinerTableau() {
     tr.innerHTML = `<td class="num">${i + 1}</td>
       <td><span class="avatar">${echapper(initiales(c))}</span>${echapper((c.prenom + ' ' + c.nom).trim() || '—')}</td>
       <td class="tel">${echapper(c.numero ? joliNumero(c.numero) : c.brut || '—')}</td>
-      <td><span class="statut s-${c.statut}">${echapper(libelle(c))}</span></td>`;
+      <td><span class="statut s-${c.statut}">${echapper(libelle(c))}</span></td>
+      <td class="suppr"><button class="btn-suppr" type="button" data-i="${i}" title="Retirer ce numéro de la liste"${c.statut === 'encours' ? ' disabled' : ''}>×</button></td>`;
     corps.appendChild(tr);
   });
+  $('#btnVider').style.display = etat.clients.length ? '' : 'none';
   $('#tableau').hidden = !etat.clients.length;
   $('#videTableau').hidden = !!etat.clients.length;
   dessinerFiltres();
   appliquerFiltre();
 }
+
+// Retirer un numéro de la liste (bouton × au bout de la ligne).
+$('#corpsTableau').addEventListener('click', async e => {
+  const b = e.target.closest('.btn-suppr');
+  if (!b) return;
+  const c = etat.clients[Number(b.dataset.i)];
+  if (!c) return;
+  if (c.statut === 'encours') return toast('Ce numéro est en cours d\'appel : attends la fin de l\'appel.', 'info');
+  b.disabled = true;
+  try {
+    const r = await api('/api/campagne/supprimer', c.numero ? { numeros: [c.numero] } : { bruts: [c.brut ?? ''] });
+    await synchroniser(true);
+    toast(r.supprimes ? 'Numéro retiré de la liste' : 'Ce numéro n\'a pas pu être retiré (appel en cours ?).', r.supprimes ? 'ok' : 'info');
+  } catch (err) { b.disabled = false; toast(err.message, 'erreur'); }
+});
+
+// Vider toute la liste (après confirmation).
+$('#btnVider').addEventListener('click', async () => {
+  if (!etat.clients.length || !confirm(`Effacer les ${etat.clients.length} numéro(s) de la liste ?`)) return;
+  try {
+    await api('/api/campagne/liste', { clients: [], remplacer: true, source: '', colonnes: [] });
+    await synchroniser(true);
+    toast('Liste vidée', 'ok');
+  } catch (err) { toast(err.message, 'erreur'); }
+});
 
 function majLigne(i) {
   const c = etat.clients[i];

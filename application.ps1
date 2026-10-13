@@ -465,7 +465,13 @@ for ($essai = 1; ; $essai++) {
     $ecoute.Prefixes.Add($adresse)
     try { $ecoute.Start(); break }
     catch {
-        if (-not $Redemarrage -or $essai -ge 20) { if (-not $Arriere) { Ouvrir-Fenetre }; exit }   # le robot tourne déjà : on rouvre juste la fenêtre
+        if (-not $Redemarrage -or $essai -ge 20) {
+            # Le robot tourne déjà (autre fenêtre ou arrière-plan) : on rouvre juste sa fenêtre.
+            Write-Host 'Le robot tourne deja (dans une autre fenetre ou en arriere-plan) : sa fenetre est rouverte.' -ForegroundColor Yellow
+            Write-Host 'Pour utiliser une nouvelle version, arrete-le d''abord (bouton Arreter, ou ferme son autre fenetre du Terminal).' -ForegroundColor Yellow
+            if (-not $Arriere) { Ouvrir-Fenetre }
+            exit
+        }
         Start-Sleep -Milliseconds 500
     }
 }

@@ -1563,7 +1563,8 @@ async function envoyerIA(texte) {
   texte = texte.trim();
   if (!texte || etat.iaOccupee) return;
   // Une clé d'IA collée dans la discussion (Google ou Claude) : on l'enregistre au lieu de l'envoyer à l'assistant.
-  if (/^(AIza[0-9A-Za-z_\-]{30,}|AQ\.[0-9A-Za-z._\-]{20,}|sk-ant-[A-Za-z0-9_\-]{20,})$/.test(texte)) {
+  if (/^(AIza|AQ\.?|sk-ant-)\S{20,}$/i.test(texte.replace(/[\s\u200B-\u200D\uFEFF]/g, ''))) {
+    texte = texte.replace(/[\s\u200B-\u200D\uFEFF]/g, '');
     $('#questionIA').value = '';
     toast('Vérification de la clé…', 'info');
     try {

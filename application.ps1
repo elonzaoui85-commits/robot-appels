@@ -401,7 +401,10 @@ function Traiter($ctx) {
             # La clé est collée dans la case de l'application ; à défaut, on la prend dans le presse-papiers.
             $cle = ([string]$corps.cle).Trim()
             if (-not $cle) { try { $cle = ([string](Get-Clipboard -Raw)).Trim() } catch {} }
-            if ($cle -match '^(AIza[0-9A-Za-z_\-]{30,}|AQ\.[0-9A-Za-z._\-]{20,})$') {
+            # Espaces et caractères invisibles parfois copiés avec la clé.
+            $cle = $cle -replace '[\s\u200B-\u200D\uFEFF]', ''
+            # Clés Google : ancien format AIza…, nouveau format AQ.… (vérifiées ensuite auprès de Google).
+            if ($cle -match '^(AIza|AQ\.?)\S{20,}$') {
                 # Clé gratuite Google Gemini
                 try { $modele = Tester-CleGemini $cle } catch { Repondre $ctx 400 @{ erreur = $_.Exception.Message }; return }
                 Definir 'ia_cle_gemini' $cle

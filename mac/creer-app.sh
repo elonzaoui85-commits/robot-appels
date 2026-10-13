@@ -10,7 +10,7 @@ mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources/robot"
 cp "$RACINE/mac/lanceur.sh" "$APP/Contents/MacOS/Robot appels"
 chmod +x "$APP/Contents/MacOS/Robot appels"
 cp "$RACINE/mac/robot.icns" "$APP/Contents/Resources/robot.icns"
-(cd "$RACINE" && tar -cf - --exclude ./mac --exclude ./resultats --exclude ./campagne.json --exclude ./.gitignore --exclude ./.gitattributes .) | tar -xf - -C "$APP/Contents/Resources/robot"
+(cd "$RACINE" && tar -cf - --exclude ./.git --exclude ./mac --exclude ./resultats --exclude ./campagne.json --exclude ./.gitignore --exclude ./.gitattributes .) | tar -xf - -C "$APP/Contents/Resources/robot"
 cat > "$APP/Contents/Info.plist" <<'PLIST'
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
